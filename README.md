@@ -1,32 +1,40 @@
 # Child_BOI
-A respository of Child body-object interaction norms for 3,359 English words. This repository includes the RMarkdown analysis and data files.
+A respository of Child Body-Object Interaction norms for 3,359 English words. This repository includes the RMarkdown analysis and data files.
 
 # Data Files
-Child BOI Data Files
-CBOI_rawdata.csv - Raw ratings provided by 284 participants
-CBOI_mean_sd.csv - Mean Child BOI Ratings, SD of Ratings and number of valid ratings per item
-CBOI_Prac_Control.csv - Raw ratings for practice and control word items
-Pilot_Ratings.csv - Ratings collected from a pilot study where we collected Child BOI ratings for a set of 221 items from 39 participants
+## Child BOI Data Files <br />
+File Name | Description
+----------| -----------
+CBOI_rawdata.csv | Raw ratings provided by 284 participants
+CBOI_mean_sd.csv | Mean Child BOI Ratings, SD of Ratings and number of valid ratings per item
+CBOI_Prac_Control.csv | Raw ratings for practice and control word items
+Pilot_Ratings.csv | Ratings collected from a pilot study where we collected Child BOI ratings for a set of 221 items from 39 participants
 
-Adult BOI Data Files
-Pexman_BOI_Norms.csv - Adult BOI Ratings from Pexman et al. (2019) 
+## Adult BOI Data Files <br />
+File Name | Description
+----------| -----------
+Pexman_BOI_Norms.csv | Adult BOI Ratings from Pexman et al. (2019)
 
-Lexical Dimension Files
-MCDI.csv - Age of aquisition norms derived from the MacArthur Bates Communicative Development Inventory (Fenson et al., 1993)
-Dale_ORourke_AoA.csv - Test-based age of acquisition norms derived from Dale and O'Rourke (1981) and updated by Brysbaert and Biemiller (2017)
-AoA_ratings_Kuperman.csv - Rating-based age of acquisition norms from Kuperman et al. (2012)
-PoS_information.csv - Dominant part of speech for 74,287 words
-ELP.csv - Length log subtitle frequency, orthographic and phonological Levenshtein distance extracted from the English Lexicon Project (Balota et al., 2007)
-Freq_CHILDES.csv - Raw frequency counts extracted from North American English conversations of child-directed speech from the CHILDES database (MacWhinney, 2000)
+## Lexical Dimension Files <br />
+File Name | Description
+----------| -----------
+MCDI.csv | Age of aquisition norms derived from the MacArthur Bates Communicative Development Inventory (Fenson et al., 1993)
+Dale_ORourke_AoA.csv | Test-based age of acquisition norms derived from Dale and O'Rourke (1981) and updated by Brysbaert and Biemiller (2017) 
+AoA_ratings_Kuperman.csv | Rating-based age of acquisition norms from Kuperman et al. (2012) 
+PoS_information.csv | Dominant part of speech for 74,287 words 
+ELP.csv | Length log subtitle frequency, orthographic and phonological Levenshtein distance extracted from the English Lexicon Project (Balota et al., 2007)
+Freq_CHILDES.csv | Raw frequency counts extracted from North American English conversations of child-directed speech from the CHILDES database (MacWhinney, 2000)
 
-Semantic Dimension Files
-Conc_Brysbaert.csv - Concreteness ratings from Brysbaert et al. (2014)
-Danger_Wurm.csv - Danger ratings from Witherell et al. (2012)
-Imageability_norms_cortese_schock.csv - Imageability ratings for mono and bisyllabic words (Cortese & Fuggett, 2004, Schock et al., 2012)
-PMA_Ansel.csv - Perceptual and motor attribute ratings from Amsel et al. (2012)
-SER_norms_JuhaszYap.csv - Sensory experience ratings from Juhasz and Yap (2013)
-SM_norms_Lynott.csv - Perceptual and action strength ratings from the Lancaster Sensorimotor norms (Lynott et al., 2020)
-VAD_Warriner.csv - Valence and arousal ratings from Warriner et al. (2013)
+## Semantic Dimension Files <br />
+File Name | Description
+----------| -----------
+Conc_Brysbaert.csv | Concreteness ratings from Brysbaert et al. (2014) 
+Danger_Wurm.csv | Danger ratings from Witherell et al. (2012) 
+Imageability_norms_cortese_schock.csv | Imageability ratings for mono and bisyllabic words (Cortese & Fuggett, 2004, Schock et al., 2012) 
+PMA_Ansel.csv | Perceptual and motor attribute ratings from Amsel et al. (2012) 
+SER_norms_JuhaszYap.csv | Sensory experience ratings from Juhasz and Yap (2013) 
+SM_norms_Lynott.csv | Perceptual and action strength ratings from the Lancaster Sensorimotor norms (Lynott et al., 2020) 
+VAD_Warriner.csv | Valence and arousal ratings from Warriner et al. (2013) 
 
 # References
 Amsel, B. D., Urbach, T. P., & Kutas, M. (2012). Perceptual and motor attribute ratings for 559 object concepts. Behavior Research Methods, 44(4), 1028–1041. https://doi.org/10.3758/s13428-012-0215-z
