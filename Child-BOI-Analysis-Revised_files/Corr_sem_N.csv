@@ -1,0 +1,25 @@
+Measure,V1,Ncount
+Arousal,775,"n = 2,584"
+Auditory.mean,140,"n = 3,219"
+Child_BOI,0,"n = 3,359"
+Color,3028,n = 331
+Conc,138,"n = 3,221"
+DMean,2846,n = 513
+Foot_leg.mean,140,"n = 3,219"
+Grasp,3028,n = 331
+Gustatory.mean,140,"n = 3,219"
+Hand_arm.mean,140,"n = 3,219"
+Haptic.mean,140,"n = 3,219"
+Head.mean,140,"n = 3,219"
+Image,1114,"n = 2,245"
+Interoceptive.mean,140,"n = 3,219"
+Minkowski3.action,140,"n = 3,219"
+Minkowski3.perceptual,140,"n = 3,219"
+Motion,3028,n = 331
+Mouth.mean,140,"n = 3,219"
+Olfactory.mean,140,"n = 3,219"
+Pain,3028,n = 331
+SER,1217,"n = 2,142"
+Torso.mean,140,"n = 3,219"
+Val,775,"n = 2,584"
+Visual.mean,140,"n = 3,219"

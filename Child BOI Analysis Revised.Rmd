@@ -1,0 +1,632 @@
+---
+author:
+- name: 
+  affiliation: 
+  corresponding: 
+  address: 
+  email: 
+  role:
+shorttitle: "Child BOI"
+output:
+  papaja::apa6_docx: default
+  papaja::apa6_pdf: default
+floatsintext: yes
+figurelist: no
+tablelist: no
+footnotelist: no
+linenumbers: no
+mask: no
+draft: no
+documentclass: apa7
+classoption: man
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+library(tidyverse)
+library(stats)
+library(Hmisc)
+library(olsrr)
+library(renv)
+library(papaja)
+library(reghelper)
+library(lmSupport)
+library(apaTables)
+library(ggcorrplot)
+library(psychometric)
+library(psych)
+library(gt)
+library(MASS)
+library(car)
+```
+
+# Results
+
+The data were cleaned following methods laid out in Pexman et al. (2019) to screen for invalid responses (e.g., inattentive participants, bot responses) in the online questionnaire. First, 10 participants who indicated hearing less than 50% English at home were excluded. We then excluded three participants who completed less than 33% of the questionnaire and 32 participants who provided the same rating for more than 12 words in a row. Then ratings for the 20 control words were compared to ratings already acquired for those words from the pilot study. Any participant whose ratings correlated with the pilot data between -0.5 and 0.2 were to be excluded, however, all remaining participants had a correlation higher than 0.2 across the control words. Finally, we calculated the correlation between each remaining participants’ ratings and the average rating of all participants on the same words. Any participant with a correlation less than 0.10 was to be excluded, however no additional participants were removed due to this criterion. A total of 61 participants were removed via these data cleaning steps, leaving responses from 286 participants. Table 1 provides the difference in demographic information for the total and retained samples. Demographic features did not vary drastically between the full and retained samples. 
+
+```{r include = FALSE}
+#Add demographics table
+```
+
+```{r include = FALSE}
+##Read in datasets
+#Child BOI ratings filter out all control and practice words
+CBOI <- read_csv("data/CBOI_mean_sd.csv") %>% 
+  rename("Child_BOI" = "Mean")
+
+#Adult BOI ratings from Pexman et al., 2019 
+ABOI <- read_csv("data/Pexman_BOI_Norms.csv") %>% 
+  dplyr::select(Word, Mean) %>% 
+  rename(Adult_BOI = Mean)
+
+#Part of Speech information from ELP
+POS <- read_csv("data/PoS_Information.csv")
+
+#Import MCDI data
+MCDI <- read_csv("data/MCDI.csv") %>% 
+  dplyr::select(Word, MCDI_AoA) 
+
+#Import AoA test-based from Dale & O'Rourke (1981), updated by Brysbaert & Biemiller (2017)
+AoA_test <- read_csv("data/Dale_ORourke_AoA.csv") %>% 
+  dplyr::select(Word, AoAtestbased)
+
+#take min values for unique items in AoA test-based norms
+low_AoA_test <- aggregate(AoAtestbased ~ Word, AoA_test, min)
+max_AoA_test <- aggregate(AoAtestbased ~ Word, AoA_test, max)
+colnames(low_AoA_test) <- c("Word", "AoA_test_min")
+colnames(max_AoA_test) <- c("Word", "AoA_test_max")
+
+#merge unique AoA test-based min and max values 
+AoA_all <- merge(low_AoA_test, max_AoA_test)
+
+#Import Kuperman et al. (2012) ratings-based AoA
+AoA_K <- read_csv("data/AoA_ratings_Kuperman.csv") %>% 
+  dplyr::select(Word, Rating.Mean) %>% 
+  rename("AoA_K" = "Rating.Mean")
+
+#Import Brysbaert et al. (2014) Concreteness
+Conc_B <- read_csv("data/Conc_Brysbaert.csv") %>% 
+  dplyr::select(Word, Conc.M) %>% 
+  rename("Conc" = "Conc.M")
+
+#Import Juhasz and Yap (2013) Sensory Experience Ratings
+SER <- read_csv("data/SER_norms_JuhaszYap.csv") %>% 
+  rename("SER" = "Average SER")
+
+#Import Imageability ratings for monosyllabic (Cortese & Fuggett, 2004) and bisyllabic (Schock, Cortese, & Khanna, 2012) words
+Image <- read_csv("data/Imageability_norms_cortese_schock.csv") %>% 
+  dplyr::select(Word, rating) %>% 
+  rename("Image" = "rating")
+
+#Import Warriner et al. (2013) Valence and Arousal
+VAD <- read_csv("data/VAD_Warriner.csv") %>% 
+  dplyr::select(Word, V.Mean.Sum, A.Mean.Sum) %>% 
+  rename("Val" = "V.Mean.Sum", "Arousal" = "A.Mean.Sum")
+
+#Import Length, LgSBTLWF, OLD, and PLD from ELP
+ELP <- read_csv("data/ELP.csv") %>% 
+  dplyr::select(Word, OLD, PLD, LgSUBTLWF)
+
+#Import frequency count from CHILDES and calculate log frequency based on Brysbaert & New, 2009
+Childes_Freq <- read_csv("data/Freq_CHILDES.csv") %>% 
+  mutate(Childes_lgFreq = log(Frequency+1, base = 10)) 
+
+#Import Lynott et al. 2020 sensorimotor norms
+SMN <- read_csv("data/SM_norms_Lynott.csv") %>% 
+  dplyr::select(Word, Auditory.mean, Gustatory.mean, Haptic.mean, Interoceptive.mean, Olfactory.mean, Visual.mean, Foot_leg.mean, Hand_arm.mean, Head.mean, Mouth.mean, Torso.mean, Minkowski3.perceptual, Minkowski3.action, Minkowski3.sensorimotor) %>% 
+  mutate(Word = tolower(Word))
+
+#Import Amsel et al. 2012 perceptual and motor norms
+PMN <- read_csv("data/PMA_Amsel.csv") %>% 
+  dplyr::select(Word, Pain, Smell, Color, Taste, Sound, Grasp, Motion)
+
+#Import Witherell et al. (2012) Danger ratings
+Danger <- read_csv("data/Danger_Wurm.csv")
+```
+
+
+```{r include = FALSE}
+##Validity and reliability section
+#read in control and practice word ratings data
+CBOI_PC <- read_csv("data/CBOI_Prac_Control.csv")
+CBOI_Pilot <- read_csv("data/Pilot_ratings.csv") %>% 
+  dplyr::select(Word, Mean, SD)
+
+#Calculate ICC using function from psychometric package based on Brysbaert et al. 2019 
+icc_data <- CBOI_PC %>% 
+  filter(Type == "Control") %>% 
+  dplyr::select(!Type) %>% 
+  pivot_longer(!Item, names_to = "Subject", values_to = "Rating")
+
+pc_icc1 <-ICC1.lme(Rating, Item, data = icc_data)
+pc_icc2 <-ICC2.lme(Rating, Item, data = icc_data)
+
+#Get Pilot Ratings and add to new Child BOI ratings to check correlation
+CBOI_Pilot <- CBOI_Pilot %>% left_join(CBOI, by = "Word") %>% drop_na()
+CBOI_Pilot_corr <- cor(CBOI_Pilot$Mean, CBOI_Pilot$Child_BOI, use = "complete.obs")
+
+```
+
+The resulting child BOI ratings and raw data are available at: https://osf.io/xcezv/. We examined the reliability of the ratings by computing two intraclass correlation coefficients (ICC) based on the control word ratings from all participants (Brysbaert et al., 2019; Fletcher, 2015). The first ICC corresponds to the average correlation of the control item ratings between participants and was `r round(pc_icc1, digits = 2)`. The second ICC corresponds to the anticipated correlation between the mean ratings of the existing participants and the mean ratings that would be anticipated if we collected an equivalent group of participants and was 0.997. We then examined the validity of the ratings by comparing the new Child BOI ratings to Child BOI ratings collected in the pilot study (n = 211). The current child BOI ratings were strongly correlated with the ratings collected in the pilot study (*r* = `r round(CBOI_Pilot_corr, digits = 2)`). 
+
+```{r include = FALSE}
+##Descriptive statistics and distributions of Child BOI ratings
+#Calculate descriptive statistics for ratings data
+CBOI_nocontrol <- CBOI %>% 
+  filter(N < 200) %>% 
+  mutate(Length = str_length(str_remove_all(Word, " |-")))
+
+CBOI_distribution <- left_join(CBOI_nocontrol, POS, by = "Word")
+CBOI_distribution <- left_join(CBOI_distribution, ABOI, by = "Word")
+
+CBOI_distribution <- CBOI_distribution %>% mutate(BOI_Diff = Child_BOI - Adult_BOI)
+
+desc_CBOI <-describe(CBOI_distribution$Child_BOI)
+mean_CBOI <- round(mean(CBOI_distribution$Child_BOI), digits = 2)
+median_CBOI <- round(median(CBOI_distribution$Child_BOI), digits = 2)
+sd_CBOI <- round(sd(CBOI_distribution$Child_BOI), digits = 2)
+min_CBOI <- round(min(CBOI_distribution$Child_BOI), digits = 2)
+max_CBOI <- round(max(CBOI_distribution$Child_BOI), digits = 2)
+q_CBOI <- quantile(CBOI_distribution$Child_BOI)
+
+Statistic <- c("Mean", "Median", "Standard Deviation", "Minimum", "Maximum", "1st quartile", "3rd quartile", "Skewness", "Kurtosis")
+
+Value <- c(mean_CBOI, median_CBOI, sd_CBOI, min_CBOI, max_CBOI, 2.63, 4.72, desc_CBOI$skew, desc_CBOI$kurtosis )
+
+descriptives <- data.frame(Statistic, Value)
+
+CBOI_nocontrol %>% 
+  ggplot(aes(x = Child_BOI)) +
+  geom_density(aes(y = ..count../10),color="#00bfc4", fill = "#00bfc4", alpha = .2) +
+  geom_histogram(color = "black", fill  = "grey", binwidth = 0.1, alpha = .2) +
+  ylab("Count") +
+  xlab("Child BOI Rating") +
+  theme_bw()
+
+ggsave("figures/Figure1.png", width = 10, height = 6)
+
+CBOI_all_PoS_filtered <- CBOI_distribution %>%
+  filter(!is.na(Adult_BOI)) %>%
+  pivot_longer(c(Child_BOI, Adult_BOI), names_to = "BOI", values_to = "BOI_rating") %>%
+  mutate(Dom_PoS1 = ifelse(Dom_PoS %in% c("Noun", "Adjective", "Verb", "Adverb"), Dom_PoS, "Other"))
+
+CBOI_all_PoS_filtered <- CBOI_all_PoS_filtered %>%
+  bind_rows(CBOI_distribution %>%
+  filter(!is.na(Adult_BOI)) %>%
+  pivot_longer(c(Child_BOI, Adult_BOI), names_to = "BOI", values_to = "BOI_rating") %>%
+  mutate(Dom_PoS1 = ".All words"))
+
+CBOI_all_PoS_counts_filtered <- CBOI_all_PoS_filtered %>%
+  filter(!is.na(BOI_rating)) %>%
+  group_by(Dom_PoS1, BOI) %>%
+  count() %>%
+  mutate(n = formatC(n, big.mark = ",")) %>% 
+  mutate(n = paste0("n = ", n))
+
+POS_names <- as_labeller(c(".All words" = "All words (n = 2,421)", "Noun" = "Noun (n = 1,531)", "Verb" = "Verb (n = 463)", "Adjective" = "Adjective (n = 216)", "Adverb" = "Adverb (n = 53)", "Other" = "Other (n = 158)"))
+
+CBOI_all_PoS_filtered %>%
+  ggplot(aes(x = BOI_rating, fill = BOI)) +
+  geom_density(aes(y = ..count../10, colour = BOI, fill = NULL), alpha = .2, show.legend = FALSE) +
+  geom_histogram(data = CBOI_all_PoS_filtered %>%
+                   filter(BOI == "Child_BOI"),
+                 binwidth = 0.1, alpha = .2) +
+  geom_histogram(data = CBOI_all_PoS_filtered %>%
+                   filter(BOI == "Adult_BOI"),
+                 binwidth = 0.1, alpha = .2) +
+  #geom_text(data = CBOI_all_PoS_counts_filtered %>% filter(BOI == "Child_BOI"), aes(x = 7, y = 125, label = n), hjust = 1, inherit.aes = FALSE) +
+  scale_x_continuous(breaks = seq(1, 7, 1)) +
+  scale_fill_discrete(labels = c("Adult BOI", "Child BOI")) +
+  ylab("Count") +
+  xlab("BOI Rating") +
+  facet_wrap(~factor(Dom_PoS1, levels = c(".All words", "Noun", "Verb", "Adjective", "Adverb", "Other")), labeller = POS_names) +
+  theme_bw() +
+  guides(colour = "none") +
+  theme(legend.position = "top",
+        legend.title = element_blank())
+
+ggsave("figures/Figure2.png", width = 10, height = 6)
+
+```
+
+Descriptive statistics for child BOI ratings of 3,359 words are presented in Table 2 and the distribution of the Child BOI ratings is shown in Figure 1. The Child BOI ratings showed a slight bimodal distribution. We further assessed the distribution of the Child BOI ratings by syntactic class, as compared to the distribution of Adult BOI ratings for the same items (n = 2,421; Figure 2). When comparing across all syntactic classes, the Adult BOI ratings appear to be bimodally distributed relative to the Child BOI ratings. For nouns, Adult BOI shows a greater concentration of items rated between ~4.25 and 6.5, whereas Child BOI shows a somewhat more even distribution of items rated between ~3 and 6.5, with more items rated above 6.5 than the Adult BOI ratings. However, for all other syntactic classes, Child BOI ratings showed a greater concentration of ratings above 3 compared to the Adult BOI ratings. This may reflect a belief that children have a greater degree of sensorimotor experiences with the world and therefore provide higher BOI ratings even for syntactic classes which are typically associated with less body-object interaction information by adult standards. 
+
+
+```{r show table 2}
+papaja::apa_table(descriptives, 
+                  caption = "Regression Coefficients from Item-Level Analyses Predicting MCDI Age of Acquisition (N = 407)", 
+                  note = "NA")
+```
+
+**Figure 1**
+
+*Distribution of Child Body-Object Interaction Ratings for 3,359 Words*
+
+**Figure 2**
+
+*Distribution of Child and Adult Body-Object Interaction Ratings By Syntactic Class*
+
+
+```{r include = FALSE, message = FALSE}
+##Relationship to other lexical semantic dimensions
+#Combine data
+CBOI_allratings <-list(CBOI_nocontrol, ABOI, AoA_K, AoA_all, Childes_Freq, Conc_B, Danger, ELP, Image, MCDI, POS, SER, PMN, VAD, SMN) %>% reduce(left_join, by = "Word")
+
+CBOI_allratings <- CBOI_allratings %>% 
+  mutate(BOI_Diff = Child_BOI - Adult_BOI)
+
+CBOI_corr_ling <- CBOI_allratings %>% 
+  dplyr::select(Child_BOI, Adult_BOI, PLD, OLD, Childes_lgFreq, LgSUBTLWF, Length, MCDI_AoA,AoA_test_min, AoA_K) %>% 
+  rename("Adult BOI (n = 2,421)" = Adult_BOI, "Child BOI (n = 3,359)" = Child_BOI, "AoA rating-based (n = 2,928)" = AoA_K, "AoA test-based (n = 3,355)" = AoA_test_min, "LgChildesWF (n = 3,354)" = Childes_lgFreq, "Length (n = 3,359)" = Length, "LgSUBTLWF (n = 3,309)" = LgSUBTLWF, "AoA MCDI (n = 511)" = MCDI_AoA, "OLD (n = 3,301)" = OLD, "PLD (n = 3,301)" = PLD)
+
+CBOI_corr_sem <- CBOI_allratings %>% 
+  dplyr::select(Child_BOI, Adult_BOI, DMean, Pain, Motion, Grasp, Color, Minkowski3.action, Torso.mean, Mouth.mean, Head.mean, Hand_arm.mean, Foot_leg.mean, Minkowski3.perceptual, Visual.mean, Olfactory.mean, Haptic.mean, Gustatory.mean, Interoceptive.mean, Auditory.mean, Val, Arousal, SER, Image, Conc) %>% 
+  rename("Adult BOI (n = 2,421)" = Adult_BOI, "Child BOI (n = 3,359)" = Child_BOI, "Concreteness (n = 3,221)" = Conc, "Imageability (n = 2,245)" = Image, "SER (n = 2,142)" = SER, "Arousal (n = 2,584)" = Arousal, "Valence (n = 2,584)" = Val, "Auditory (n = 3,219)" = Auditory.mean, "Interoceptive (n = 3,219)" = Interoceptive.mean, "Gustatory (n = 3,219)" = Gustatory.mean, "Haptic (n = 3,219)" = Haptic.mean, "Olfactory (n = 3,219)" = Olfactory.mean, "Visual (n = 3,219)" = Visual.mean, "Perceptual strength (n = 3,219)" = Minkowski3.perceptual, "Foot/leg (n = 3,219)" = Foot_leg.mean, "Hand/arm (n = 3,219)" = Hand_arm.mean, "Head (n = 3,219)" = Head.mean, "Mouth (n = 3,219)" = Mouth.mean, "Torso (n = 3,219)" = Torso.mean, "Action strength (n = 3,219)" = Minkowski3.action, "Color (n = 331)" = Color, "Grasp (n = 331)" = Grasp, "Motion (n = 331)" = Motion, "Pain (n = 331)" = Pain, "Danger (n = 513)" = DMean)
+
+corr_results_ling <- round(cor(CBOI_corr_ling, use = "pairwise.complete.obs"),2)
+corr_results_sem <- round(cor(CBOI_corr_sem, use = "pairwise.complete.obs"),2)
+
+Corr_sem_NAcounts <-CBOI_corr_sem %>% 
+  dplyr::select(everything()) %>% 
+  summarise_all(funs(sum(is.na(.)))) %>% 
+  t %>% 
+  as.data.frame() %>% 
+  mutate(Ncount = paste0("n = ", formatC(3359-V1, big.mark = ","))) %>% 
+  add_rownames(var = "Measure") %>% 
+  arrange(Measure)
+
+ggcorrplot(corr_results_ling, type = "upper", lab = TRUE, lab_size = 6, tl.cex = 16, outline.col = "white", ggtheme = ggplot2::theme_bw, colors = c("#f8766d", "white", "#00bfc4"))
+
+ggsave("figures/Figure3.png", width = 15, height = 15)
+
+ggcorrplot(corr_results_sem, type = "upper", lab = TRUE, lab_size = 8, tl.cex = 20, outline.col = "white", ggtheme = ggplot2::theme_bw, colors = c("#f8766d", "white", "#00bfc4"))
+
+ggsave("figures/Figure4.png", width = 25, height = 25)
+
+```
+
+We then examined relationships between the new Child and existing Adult BOI ratings to linguistic ratings datasets. We inspected how each of the BOI rating sets correlated with the lexical dimensions length (number of letters), log frequency derived from child-directed speech in the CHILDES databases (MacWhinney, 2000), orthographic and phonological Levenshtein distance (Yarkoni, Balota, & Yap, 2008), age-of-acquisition derived from the MacArthur Bates Communicative Development Inventory (MCDI; Fenson et al., 1993), a test-based measure of age-of-acquisition derived from Dale and O'Rourke (1981) and updated by Brysbaert and Biemiller (2017), and a ratings-based measure of age-of-acquisition (Kuperman et al., 2012). The correlations are presented in Figure 3.
+
+Child BOI was strongly related to frequency in child-based speech (Child BOI *r* = `r corr_results_ling[5,1]`, Adult BOI *r* = `r corr_results_ling[5,2]`), whereas Adult BOI was more strongly related to subtitle frequency (Child BOI *r* = `r corr_results_ling[6,1]`, Adult BOI *r* = `r corr_results_ling[6,2]`). Child BOI was more related to all three measures of AoA than Adult BOI was; ratings-based (Child BOI *r* = `r corr_results_ling[10,1]`, Adult BOI *r* = `r corr_results_ling[10,2]`), MCDI (Child BOI *r* = `r corr_results_ling[8,1]`, Adult BOI *r* = `r corr_results_ling[8,2]`), and test-based (Child BOI *r* = `r corr_results_ling[9,1]`, Adult BOI *r* = `r corr_results_ling[9,2]`). 
+
+**Figure 3**
+
+*Correlations Between Child and Adult Body-Object Interaction Ratings and Lexical Dimensions*
+
+We next examined relationships between the new Child and existing Adult BOI ratings to the semantic dimensions related to sensorimotor, perceptual and emotional experience, including concreteness (Brysbaert et al., 2014), imageability (Cortese & Fuggett, 2004; Schock, Cortese, & Khanna, 2012), sensory experience ratings (SER; Juhasz & Yap, 2013), arousal and valence (Warriner et al., 2013), danger (Witherell et al., 2012) perceptual and action strength ratings from the Lancaster Sensorimotor Norms (auditory, interoceptive, gustatory, haptic, olfactory, visual, foot/leg actions, hand/arm actions, head actions, mouth actions, torso actions, and composite measures of overall perceptual and action strength; Lynott et al., 2020), and perceptual and motor attribute ratings on color, grasp, motion, and pain (Amsel et al., 2012). The correlations are presented in Figure 4.
+
+Child BOI was more related than Adult BOI to SER (Child BOI *r* = `r corr_results_sem[23,1]`, Adult BOI *r* = `r corr_results_sem[23,2]`) and Valence (Child BOI *r* = `r corr_results_sem[21,1]`, Adult BOI *r* = `r corr_results_sem[21,2]`). Adult BOI was more related to concreteness (Child BOI (*r* = `r corr_results_sem[25,1]`), Adult BOI (*r* = `r corr_results_sem[25,2]`), imageability (Child BOI (*r* = `r corr_results_sem[24,1]`), Adult BOI (*r* = `r corr_results_sem[24,2]`), and arousal (Child BOI (*r* = `r corr_results_sem[22,1]`), Adult BOI (*r* = `r corr_results_sem[22,2]`). 
+
+On the Lancaster perceptual strength ratings, Child and Adult BOI relationships were similar on most dimensions, although Child BOI was much less related to interoceptive strength (Child BOI (*r* = `r corr_results_sem[19,1]`), Adult BOI (*r* = `r corr_results_sem[19,2]`). On the Lancaster action strength ratings, Child BOI was more related than Adult BOI to foot/leg actions ratings (Child BOI *r* = `r corr_results_sem[13,1]`, Adult BOI *r* = `r corr_results_sem[13,2]`), mouth action ratings (Child BOI *r* = `r corr_results_sem[10,1]`, Adult BOI *r* = `r corr_results_sem[10,2]`) and torso action ratings (Child BOI *r* = `r corr_results_sem[9,1]`, Adult BOI *r* = `r corr_results_sem[9,2]`), as well as the composite measure of action strength (Child BOI *r* = `r corr_results_sem[8,1]`, Adult BOI *r* = `r corr_results_sem[8,2]`). In addition, Child BOI was more positively related than Adult BOI to color attributes (Child BOI *r* = `r corr_results_sem[7,1]`, Adult BOI *r* = `r corr_results_sem[7,2]`), and more negatively related to pain attributes (Child BOI *r* = `r corr_results_sem[4,1]`, Adult BOI *r* = `r corr_results_sem[4,2]`) and danger (Child BOI *r* = `r corr_results_sem[3,1]`, Adult BOI *r* = `r corr_results_sem[3,2]`). Adult BOI was more related to both grasp attributes (Child BOI *r* = `r corr_results_sem[6,1]`, Adult BOI *r* = `r corr_results_sem[6,2]`) and negatively related to motion attributes (Child BOI *r* = `r corr_results_sem[5,1]`, Adult BOI *r* = `r corr_results_sem[5,2]`).
+
+**Figure 4**
+
+*Correlations Between Child and Adult Body-Object Interaction Ratings and Semantic Dimensions*
+
+```{r include = FALSE, echo = FALSE, message = FALSE}
+CBOI_allratings %>%
+  dplyr::select(MCDI_AoA, AoA_test_min, AoA_K, Length, Adult_BOI, Child_BOI, BOI_Diff, Childes_lgFreq, LgSUBTLWF, OLD, PLD, DMean, Pain, Motion, Grasp, Color, Minkowski3.action, Minkowski3.perceptual, Torso.mean, Head.mean, Mouth.mean, Hand_arm.mean, Foot_leg.mean, Visual.mean, Olfactory.mean, Haptic.mean, Gustatory.mean, Interoceptive.mean, Auditory.mean, Val, Arousal, SER, Image, Conc) %>%
+  rename("AoA MCDI (n = 474)" = MCDI_AoA, "AoA test-based (n = 2,421)" = AoA_test_min, "AoA rating-based (n = 2,322)" = "AoA_K", "Adult BOI (n = 2,421)" = Adult_BOI, "Child BOI (n = 2,421)" = Child_BOI, "LgChildesWF (n = 2,418)" = Childes_lgFreq, "LgSUBTLWF (n = 2,418)" = LgSUBTLWF, "OLD (n = 2,416)" = OLD, "PLD (n = 2,416)" = PLD, "Danger (n = 468)" = DMean, "Pain (n = 309)" = Pain,  "Motion (n = 309)" = Motion, "Grasp (n = 309)" = Grasp, "Color (n = 309)" = Color, "Action Strength (n = 2,421)" = Minkowski3.action, "Perceptual Strength (n = 2,421)" = Minkowski3.perceptual, "Torso (n = 2,421)" = Torso.mean, "Head (n = 2,421)" = Head.mean, "Mouth (n = 2,421)" = Mouth.mean, "Hand/arm (n = 2,421)" = Hand_arm.mean, "Foot/leg (n = 2,421)" = Foot_leg.mean, "Visual (n = 2,421)" = Visual.mean, "Olfactory (n = 2,421)" = Olfactory.mean, "Haptic (n = 2,421)" = Haptic.mean, "Gustatory (n = 2,421)" = Gustatory.mean, "Interoceptive (n = 2,421)" = Interoceptive.mean, "Auditory (n = 2,421)" = Auditory.mean, "Valence (n = 2,116)" = Val, "Arousal (n = 2,116)" = Arousal, "Imageability (n = 1,969)" = Image, "Concreteness (n = 2,421)" = Conc, "SER (n = 1,902)" = SER, "Length (n = 2,421)" = Length) %>%
+  filter(!is.na(BOI_Diff)) %>%
+  pivot_longer(c(-BOI_Diff), names_to = "variable", values_to = "value") %>%
+  ggplot(aes(x = BOI_Diff, y = value)) +
+  geom_point(size = 0.05, alpha = 0.5, colour = "#BBBBBB") +
+  geom_smooth(method = "lm", colour = "#00bfc4") +
+  geom_segment(aes(x = 0, xend = 0, y = -Inf, yend = Inf), colour = "black", linetype = 2) +
+  scale_x_continuous(breaks = seq(-4, 4, 2)) +
+  facet_wrap(~factor(variable, levels = c("Adult BOI (n = 2,421)", "Child BOI (n = 2,421)", "AoA rating-based (n = 2,322)", "AoA test-based (n = 2,421)", "AoA MCDI (n = 474)", "Length (n = 2,421)", "LgChildesWF (n = 2,418)", "LgSUBTLWF (n = 2,418)", "OLD (n = 2,416)", "PLD (n = 2,416)", "Concreteness (n = 2,421)", "Imageability (n = 1,969)", "Arousal (n = 2,116)", "Valence (n = 2,116)", "SER (n = 1,902)", "Auditory (n = 2,421)", "Interoceptive (n = 2,421)", "Gustatory (n = 2,421)", "Haptic (n = 2,421)", "Olfactory (n = 2,421)", "Visual (n = 2,421)", "Foot/leg (n = 2,421)", "Hand/arm (n = 2,421)", "Head (n = 2,421)", "Mouth (n = 2,421)", "Torso (n = 2,421)", "Action Strength (n = 2,421)", "Perceptual Strength (n = 2,421)", "Color (n = 309)", "Danger (n = 468)", "Pain (n = 309)", "Grasp (n = 309)", "Motion (n = 309)")), scales = "free", ncol = 5) +
+  theme_bw() +
+  xlab("BOI Difference Score") +
+  theme(legend.position = "top") +
+  theme(text = element_text(size = 20))
+
+ggsave("figures/Figure5.png", width = 20, height = 20)
+
+BOIdiffcor <- CBOI_allratings %>%
+  dplyr::select(MCDI_AoA, AoA_test_min, AoA_K, Length, Adult_BOI, Child_BOI, BOI_Diff, Childes_lgFreq, LgSUBTLWF, OLD, PLD, DMean, Pain, Motion, Grasp, Color, Minkowski3.action, Minkowski3.perceptual, Torso.mean, Head.mean, Mouth.mean, Hand_arm.mean, Foot_leg.mean, Visual.mean, Olfactory.mean, Haptic.mean, Gustatory.mean, Interoceptive.mean, Auditory.mean, Val, Arousal, SER, Image, Conc) %>%
+  filter(!is.na(BOI_Diff)) 
+
+boidiff_AoAK <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$AoA_K, use = "complete.obs"), digits = 2)
+boidiff_AoAT <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$AoA_test_min, use = "complete.obs"), digits = 2)
+boidiff_Conc <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Conc, use = "complete.obs"), digits = 2)
+boidiff_Image <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Image, use = "complete.obs"), digits = 2)
+boidiff_Visual <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Visual.mean, use = "complete.obs"), digits = 2)
+boidiff_Danger <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$DMean, use = "complete.obs"), digits = 2)
+boidiff_Pain <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Pain, use = "complete.obs"), digits = 2)
+boidiff_ChildWF <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Childes_lgFreq, use = "complete.obs"), digits = 2)
+boidiff_WF <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$LgSUBTLWF, use = "complete.obs"), digits = 2)
+boidiff_Val <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Val, use = "complete.obs"), digits = 2)
+boidiff_Intero <- round(cor(BOIdiffcor$BOI_Diff, BOIdiffcor$Interoceptive.mean, use = "complete.obs"), digits = 2)
+
+```
+
+Finally, we examined how the difference between the BOI ratings (Child BOI - Adult BOI) was related to these lexical and semantic dimensions. In this measure positive BOI difference values reflect items that have higher BOI ratings for child compared to adult experience and negative BOI differences values reflect items that have higher BOI ratings for adult compared to child experience. We fit a regression line with BOI difference on the x axis and the lexical semantic dimension rating on the y axis. These relationships are depicted in Figure 5.
+
+We observed negative relationships between BOI differences and both ratings and test-based AoA (*r* = `r boidiff_AoAK` and *r* = `r boidiff_AoAT`). This pattern indicates that items for which Child BOI was rated higher than Adult BOI are acquired earlier than items for which Adult BOI was rated as higher than Child BOI. A similar pattern can be seen for concreteness (*r* = `r boidiff_Conc`), imageability (*r* = `r boidiff_Image`), and visual (*r* = `r boidiff_Visual`) perceptual strength, indicating that items with higher adult Adult BOI ratings are associated with more concrete and visual information. Similar patterns for the danger (*r* = `r boidiff_Danger`) and pain (*r* = `r boidiff_Pain`) dimensions indicate that items with higher Adult BOI ratings are also considered more dangerous and more associated with pain.
+
+We observed positive relationships between BOI differences and both measures of word frequency (LgChildesWF *r* = `r boidiff_ChildWF` and LgSUBTLWF *r* = `r boidiff_WF`), suggesting that more frequent items also tend to receive higher Child BOI than Adult BOI ratings. Furthermore, more positive valence (*r* = `r boidiff_Val`) and higher interoceptive strength ratings (*r* = `r boidiff_Intero`) are associated with items that had higher Child BOI than Adult BOI ratings. More modest positive relationships were observed between most action strength dimensions (excluding hand/arm) and differences in BOI. 
+
+**Figure 5**
+
+*Correlations Between BOI Difference Scores and Lexical Semantic Dimensions*
+
+**Relationships to Age-of-Acquisition**
+
+The relationships for child and adult BOI with the three different AoA measures were tested using hierarchical multiple regressions. Within each AoA dataset, if any word had multiple meanings, or multiple reported AoA ratings for the same word, the earliest AoA rating was used. The first AoA measure was parent estimates of child word production from the MacArthur Bates Communicative Development Inventory (MCDI: Fenson et al., 1993). This inventory consists mainly of words typically acquired before 30 months, where AoA is measured as the month when 50% or more of the sample of infants were estimated to have the ability to produce a certain word. 
+
+The second measure was test-based AoA obtained from the updated version of Dale and O’Rourke (1981) as reported in Brysbaert and Biemiller (2017). This measure was derived by testing thousands of children in different grades for their knowledge of the meanings of thousands of words. In this dataset, each word's AoA is taken as the earliest grade level at which an estimated 50 - 70% of students chose the correct meaning from a set of three response options. The original Dale and O'Rourke dataset spanned Grades 2 through 12 and the Brysbaert and Biemiller updated dataset included grades 13 and 16 (representing university years one and four respectively).
+
+Finally, we extracted ratings-based AoA from Kuperman et al. (2012). This measure was derived from adults’ ratings of the age (in years) at which they believe they acquired a word. Each regression included frequency, length, and imageability in the first step, after which either child or adult BOI was entered as a predictor in step 2. For each measure of AoA, only words that had ratings for both child and adult BOI were included in the analyses in order to provide a fair comparison between the two predictors.
+
+	
+```{r MCDI Model, include = FALSE}
+MCDIdat <- CBOI_allratings %>% 
+  dplyr::select(Word, Childes_lgFreq, Length, Image, Child_BOI, Adult_BOI, MCDI_AoA, BOI_Diff) %>% 
+  drop_na()
+
+MCDI_step1 <- lm(MCDI_AoA ~ Childes_lgFreq + Length + Image, data = MCDIdat)
+MCDI_adultmodel <- lm(MCDI_AoA ~ Childes_lgFreq + Length + Image + Adult_BOI, data = MCDIdat)
+MCDI_childmodel <- lm(MCDI_AoA ~ Childes_lgFreq + Length + Image + Child_BOI, data = MCDIdat)
+MCDI_boidiffmodel <- lm(MCDI_AoA ~ Childes_lgFreq + Length + Image + BOI_Diff, data = MCDIdat)
+
+summary(MCDI_adultmodel)
+summary(MCDI_childmodel)
+summary(MCDI_boidiffmodel)
+summary(MCDI_step1)
+
+#Make Variables column for table
+Predictor <- c("Intercept", "log CHILDES Frequency", "Length", "Imageability", "BOI")
+
+#Make Adult Columns
+adult_MCDI_beta <-round(beta(MCDI_adultmodel)$coefficients[,1], digits = 2)
+adult_MCDI_se <-round(beta(MCDI_adultmodel)$coefficients[,2], digits = 2)
+adult_MCDI_t <-round(beta(MCDI_adultmodel)$coefficients[,3], digits = 2)
+adult_MCDI_p <-round(beta(MCDI_adultmodel)$coefficients[,4], digits = 3)
+adult_MCDI_R2 <- round(c(NA, NA, NA, NA, summary(MCDI_adultmodel)$adj.r.squared), digits = 2)
+adult_MCDI_delta <- round(c(NA, NA, NA, NA, modelCompare(MCDI_step1, MCDI_adultmodel)$Delta), digits = 2)
+adult_MCDI_deltap <- c(NA, NA, NA, NA, modelCompare(MCDI_step1, MCDI_adultmodel)$p)
+
+
+child_MCDI_beta <-round(beta(MCDI_childmodel)$coefficients[,1], digits = 2)
+child_MCDI_se <-round(beta(MCDI_childmodel)$coefficients[,2], digits = 2)
+child_MCDI_t <-round(beta(MCDI_childmodel)$coefficients[,3], digits = 2)
+child_MCDI_p <-round(beta(MCDI_childmodel)$coefficients[,4], digits = 3)
+child_MCDI_R2 <- round(c(NA, NA, NA, NA, summary(MCDI_childmodel)$adj.r.squared), digits = 2)
+child_MCDI_delta <- round(c(NA, NA, NA, NA, modelCompare(MCDI_step1, MCDI_childmodel)$Delta), digits = 2)
+child_MCDI_deltap <- c(NA, NA, NA, NA, modelCompare(MCDI_step1, MCDI_childmodel)$p)
+
+
+diff_MCDI_beta <-round(beta(MCDI_boidiffmodel)$coefficients[,1], digits = 2)
+diff_MCDI_se <-round(beta(MCDI_boidiffmodel)$coefficients[,2], digits = 2)
+diff_MCDI_t <-round(beta(MCDI_boidiffmodel)$coefficients[,3], digits = 2)
+diff_MCDI_p <-round(beta(MCDI_boidiffmodel)$coefficients[,4], digits = 3)
+diff_MCDI_R2 <- round(c(NA, NA, NA, NA, summary(MCDI_boidiffmodel)$adj.r.squared), digits = 2)
+diff_MCDI_delta <- round(c(NA, NA, NA, NA, modelCompare(MCDI_step1, MCDI_boidiffmodel)$Delta), digits = 2)
+diff_MCDI_deltap <- c(NA, NA, NA, NA, modelCompare(MCDI_step1, MCDI_boidiffmodel)$p)
+
+#Make Table
+table2 <- data.frame(Predictor, child_MCDI_beta, child_MCDI_se, child_MCDI_t, child_MCDI_p, child_MCDI_R2, child_MCDI_delta, child_MCDI_deltap, adult_MCDI_beta, adult_MCDI_se, adult_MCDI_t, adult_MCDI_p, adult_MCDI_R2, adult_MCDI_delta, adult_MCDI_deltap, diff_MCDI_beta, diff_MCDI_se, diff_MCDI_t, diff_MCDI_p, diff_MCDI_R2, diff_MCDI_delta, diff_MCDI_deltap)
+
+#replace p values less than .001 with < .001
+table2 <- table2 %>% 
+  mutate_at(vars(adult_MCDI_p, adult_MCDI_deltap, child_MCDI_p, child_MCDI_deltap, diff_MCDI_p, diff_MCDI_deltap), funs(round(., 3))) %>% 
+  mutate_at(vars(adult_MCDI_p, adult_MCDI_deltap, child_MCDI_p, child_MCDI_deltap, diff_MCDI_p, diff_MCDI_deltap), ~replace(., . < .001, "< .001"))
+
+#names(table2) <- c("B", "SE", "t", "p", "R2", "Delta R2", "p", "A_B", "A_SE", "A_t", "A_p", "A_R2", "A_Delta_R2", "A_p", "D_B", "D_SE", "D_t", "D_p", "D_R2", "D_Delta_R2", "D_p")
+
+```
+
+*MCDI*
+
+A model with only the predictors log CHILDES frequency, length, and imageability accounted for `r sprintf("%0.2f%%", summary(MCDI_step1)$adj.r.squared * 100)` of variance in MCDI AoA. The addition of adult BOI ratings to the model accounted for an additional `r sprintf("%0.2f%%", (summary(MCDI_adultmodel)$adj.r.squared - summary(MCDI_step1)$adj.r.squared) * 100)` of variance, whereas the addition of child BOI ratings to the model accounted for an additional `r sprintf("%0.2f%%", (summary(MCDI_childmodel)$adj.r.squared - summary(MCDI_step1)$adj.r.squared) * 100)` and the addition of BOI difference to the model accounted for an additional `r sprintf("%0.2f%%", (summary(MCDI_boidiffmodel)$adj.r.squared - summary(MCDI_step1)$adj.r.squared) * 100)`. For every unit increase in BOI rating, MCDI AoA decreases for Child ratings, ß = `r child_MCDI_beta[5]`, Adult ratings, ß = `r adult_MCDI_beta[5]`, and BOI differences scores, ß = `r diff_MCDI_beta[5]`. See Table 2 for estimates of all model parameters.
+
+**Table 3**
+
+```{r show table 3}
+papaja::apa_table(table2, 
+                  caption = "Regression Coefficients from Item-Level Analyses Predicting MCDI Age of Acquisition (N = 407)", 
+                  note = "MCDI")
+```
+
+
+```{r AoA testbased Model, include = FALSE}
+#Extract data for model from master data sheet
+AoAtest_dat <- CBOI_allratings %>% 
+  dplyr::select(Word, Childes_lgFreq, Length, Image, Child_BOI, Adult_BOI, AoA_test_min, BOI_Diff) %>% 
+  drop_na()
+
+#Turn the AoA variable into a factor
+AoAtest_dat$AoA_test_min <- factor(AoAtest_dat$AoA_test_min)
+
+AoA_test_step1 <- polr(AoA_test_min ~ Childes_lgFreq + Length + Image, data = AoAtest_dat, Hess = TRUE)
+AoA_test_adultmodel <- polr(AoA_test_min ~ Childes_lgFreq + Length + Image + Adult_BOI, data = AoAtest_dat, Hess = TRUE)
+AoA_test_childmodel <- polr(AoA_test_min ~ Childes_lgFreq + Length + Image + Child_BOI, data = AoAtest_dat, Hess = TRUE)
+AoA_test_diffmodel <- polr(AoA_test_min ~ Childes_lgFreq + Length + Image + BOI_Diff, data = AoAtest_dat, Hess = TRUE)
+
+#Get model summaries
+summary(AoA_test_step1)
+summary(AoA_test_adultmodel)
+summary(AoA_test_childmodel)
+summary(AoA_test_diffmodel)
+
+#Get model fit assessments
+child_LRT <-anova(AoA_test_step1, AoA_test_childmodel)
+child_LRT_row <- as.data.frame.list(c(NA, NA, NA, NA, child_LRT[2,6], child_LRT[2,7]))
+names(child_LRT_row) <- c("Value", "Std. Error", "t value", "p value", "LRT", "LRT p")
+row.names(child_LRT_row) <- "Model Fit"
+adult_LRT <-anova(AoA_test_step1, AoA_test_adultmodel)
+adult_LRT_row <- as.data.frame.list(c(NA, NA, NA, NA, adult_LRT[2,6], adult_LRT[2,7]))
+names(adult_LRT_row) <- c("Value", "Std. Error", "t value", "p value", "LRT", "LRT p")
+row.names(adult_LRT_row) <- "Model Fit"
+diff_LRT <-anova(AoA_test_step1, AoA_test_diffmodel)
+diff_LRT_row <- as.data.frame.list(c(NA, NA, NA, NA, diff_LRT[2,6], diff_LRT[2,7]))
+names(diff_LRT_row) <- c("Value", "Std. Error", "t value", "p value", "LRT", "LRT p")
+row.names(diff_LRT_row) <- "Model Fit"
+
+#Extract coefficient tables from models
+step1_coefftable <- as.data.frame(coef(summary(AoA_test_step1)))
+adult_coefftable <- as.data.frame(coef(summary(AoA_test_adultmodel)))
+child_coefftable <- as.data.frame(coef(summary(AoA_test_childmodel)))
+diff_coefftable <- as.data.frame(coef(summary(AoA_test_diffmodel)))
+
+#Calculate and store p-values for t-tests
+step1_p <- pnorm(abs(step1_coefftable[, "t value"]), lower.tail = FALSE) * 2
+adult_p <- pnorm(abs(adult_coefftable[, "t value"]), lower.tail = FALSE) * 2
+child_p <- pnorm(abs(child_coefftable[, "t value"]), lower.tail = FALSE) * 2
+diff_p <- pnorm(abs(diff_coefftable[, "t value"]), lower.tail = FALSE) * 2
+
+#Combine tables
+step1_coefftable <- cbind(step1_coefftable, "p value" = step1_p)
+adult_coefftable <- cbind(adult_coefftable, "p value" = adult_p)
+child_coefftable <- cbind(child_coefftable, "p value" = child_p)
+diff_coefftable <- cbind(diff_coefftable, "p value" = diff_p)
+
+#Add fifth row with LRT and p value to tables
+child_coefftable <- dplyr::bind_rows(child_coefftable, child_LRT_row)
+adult_coefftable <- dplyr::bind_rows(adult_coefftable, adult_LRT_row)
+diff_coefftable <- dplyr::bind_rows(diff_coefftable, diff_LRT_row)
+
+#Calculate odds ratios and CI
+#step1_ci <- confint(AoA_test_step1) 
+#step1_OR_CI <- exp(cbind(OR = coef(AoA_test_step1), ci))
+adult_ci <- as.data.frame(exp(confint(AoA_test_adultmodel)))
+adult_OR <- exp(coef(AoA_test_adultmodel))
+child_ci <- as.data.frame(exp(confint(AoA_test_childmodel)))
+child_OR <- exp(coef(AoA_test_childmodel))
+diff_ci <- as.data.frame(exp(confint(AoA_test_diffmodel)))
+diff_OR <- exp(coef(AoA_test_diffmodel))
+
+#Combine Child values
+child_coefftable$OR <- c(child_OR, NA, NA, NA)
+child_coefftable$Variable <- row.names(child_coefftable)
+child_ci$Variable <- row.names(child_ci)
+child_table <- left_join(child_coefftable, child_ci, by = "Variable")
+child_table <- child_table %>% 
+  dplyr::select(Variable, OR, `2.5 %`, `97.5 %`, `t value`, `p value`, LRT, `LRT p`) %>% 
+  rename_with(~ paste0("Child_", .x)) %>% 
+  rename("Variable" = "Child_Variable") %>% 
+  mutate(Variable=replace(Variable, Variable == "Child_BOI", "BOI"))
+
+#Combine Adult values
+adult_coefftable$OR <- c(adult_OR, NA, NA, NA)
+adult_coefftable$Variable <- row.names(adult_coefftable)
+adult_ci$Variable <- row.names(adult_ci)
+adult_table <- left_join(adult_coefftable, adult_ci, by = "Variable")
+adult_table <- adult_table %>% 
+  dplyr::select(Variable, OR, `2.5 %`, `97.5 %`, `t value`, `p value`, LRT, `LRT p`) %>% 
+  rename_with(~ paste0("Adult_", .x)) %>% 
+  rename("Variable" = "Adult_Variable") %>% 
+  mutate(Variable=replace(Variable, Variable == "Adult_BOI", "BOI"))
+  
+#Combine BOI diff values
+diff_coefftable$OR <- c(diff_OR, NA, NA, NA)
+diff_coefftable$Variable <- row.names(diff_coefftable)
+diff_ci$Variable <- row.names(diff_ci)
+diff_table <- left_join(diff_coefftable, diff_ci, by = "Variable")
+diff_table <- diff_table %>% 
+  dplyr::select(Variable, OR, `2.5 %`, `97.5 %`, `t value`, `p value`, LRT, `LRT p`) %>% 
+  rename_with(~ paste0("Diff_", .x)) %>% 
+  rename("Variable" = "Diff_Variable") %>% 
+  mutate(Variable=replace(Variable, Variable == "BOI_Diff", "BOI"))
+
+#Bind tables together 
+table3 <- left_join(child_table, adult_table, by = "Variable")
+table3 <- left_join(table3, diff_table, by = "Variable")
+
+#replace p values less than .001 with < .001
+table3 <- table3 %>% 
+  mutate_at(vars(`Child_p value`, `Child_LRT p`, `Adult_p value`, `Adult_LRT p`, `Diff_p value`, `Diff_LRT p`), funs(round(., 3))) %>% 
+  mutate_at(vars(`Child_p value`, `Child_LRT p`, `Adult_p value`, `Adult_LRT p`, `Diff_p value`, `Diff_LRT p`), ~replace(., . < .001, "< .001")) %>% 
+  mutate_at(vars(!c(`Child_p value`, `Child_LRT p`, `Adult_p value`, `Adult_LRT p`, `Diff_p value`, `Diff_LRT p`, Variable)), funs(round(., 2))) %>% 
+  rename("Predictor" = "Variable")
+```
+
+*Test-based AoA*
+
+A model with only the predictors log CHILDES frequency, length, and imageability was used to predict test-based AoA at grades 2, 4, and 6. A Likelihood Ratio Test (LRT) was used to assess improvement in model fit with the addition of the three BOI measures of interest to this base model. The addition of Child BOI ratings significantly improved the model fit, LRT = `r table3$Child_LRT[7]`, *p* = `r table3$"Child_LRT p"[7]`, as did the addition of BOI difference, LRT = `r table3$Diff_LRT[7]`, *p* = `r table3$"Diff_LRT p"[7]`. The addition of Adult BOI ratings did not result in as large an improvement in model fit as the prior two models, but the improvement was still significant, LRT = `r table3$Adult_LRT[7]`, *p* = `r table3$"Adult_LRT p"[7]`. For every unit increase in BOI rating, the odds of a word being acquired at an older grade (i.e., grades 4 or 6) decreased for both Child ratings and BOI difference scores (OR = `r child_OR[4]` and OR = `r diff_OR[4]` respectively), whereas the odds of a word being acquired at an older grade increased for Adult ratings (OR = `r adult_OR[4]`). See Table 3 for estimates of all model parameters.
+
+**Table 4**
+
+```{r show table 4}
+papaja::apa_table(table3, 
+                  caption = "Regression Coefficients from Item-Level Analyses Predicting Test-based Age of Acquisition (N = 1,966)", 
+                  note = "AoAtest")
+
+```
+
+
+```{r AoA ratebased Model, include = FALSE}
+AoArate_dat <- CBOI_allratings %>% 
+  dplyr::select(Word, Childes_lgFreq, Length, Image, Child_BOI, Adult_BOI, AoA_K, BOI_Diff) %>% 
+  drop_na()
+
+AoA_rate_step1 <- lm(AoA_K ~ Childes_lgFreq + Length + Image, data = AoArate_dat)
+AoA_rate_adultmodel <- lm(AoA_K ~ Childes_lgFreq + Length + Image + Adult_BOI, data = AoArate_dat)
+AoA_rate_childmodel <- lm(AoA_K ~ Childes_lgFreq + Length + Image + Child_BOI, data = AoArate_dat)
+AoA_rate_boidiffmodel <- lm(AoA_K ~ Childes_lgFreq + Length + Image + BOI_Diff, data = AoArate_dat)
+
+summary(AoA_rate_adultmodel)
+summary(AoA_rate_childmodel)
+summary(AoA_rate_boidiffmodel)
+summary(AoA_rate_step1)
+
+#Make Variables column for table
+Predictor <- c("Intercept", "log CHILDES Frequency", "Length", "Imageability", "BOI")
+
+#Make Adult Columns
+adult_AoA_rate_beta <-round(beta(AoA_rate_adultmodel)$coefficients[,1], digits = 2)
+adult_AoA_rate_se <-round(beta(AoA_rate_adultmodel)$coefficients[,2], digits = 2)
+adult_AoA_rate_t <-round(beta(AoA_rate_adultmodel)$coefficients[,3], digits = 2)
+adult_AoA_rate_p <-round(beta(AoA_rate_adultmodel)$coefficients[,4], digits = 3)
+adult_AoA_rate_R2 <- round(c(NA, NA, NA, NA, summary(AoA_rate_adultmodel)$adj.r.squared), digits = 2)
+adult_AoA_rate_delta <- round(c(NA, NA, NA, NA, modelCompare(AoA_rate_step1, AoA_rate_adultmodel)$Delta), digits = 2)
+adult_AoA_rate_deltap <- c(NA, NA, NA, NA, modelCompare(AoA_rate_step1, AoA_rate_adultmodel)$p)
+
+child_AoA_rate_beta <-round(beta(AoA_rate_childmodel)$coefficients[,1], digits = 2)
+child_AoA_rate_se <-round(beta(AoA_rate_childmodel)$coefficients[,2], digits = 2)
+child_AoA_rate_t <-round(beta(AoA_rate_childmodel)$coefficients[,3], digits = 2)
+child_AoA_rate_p <-round(beta(AoA_rate_childmodel)$coefficients[,4], digits = 3)
+child_AoA_rate_R2 <- round(c(NA, NA, NA, NA, summary(AoA_rate_childmodel)$adj.r.squared), digits = 2)
+child_AoA_rate_delta <- round(c(NA, NA, NA, NA, modelCompare(AoA_rate_step1, AoA_rate_childmodel)$Delta), digits = 2)
+child_AoA_rate_deltap <- c(NA, NA, NA, NA, modelCompare(AoA_rate_step1, AoA_rate_childmodel)$p)
+
+diff_AoA_rate_beta <-round(beta(AoA_rate_boidiffmodel)$coefficients[,1], digits = 2)
+diff_AoA_rate_se <-round(beta(AoA_rate_boidiffmodel)$coefficients[,2], digits = 2)
+diff_AoA_rate_t <-round(beta(AoA_rate_boidiffmodel)$coefficients[,3], digits = 2)
+diff_AoA_rate_p <-round(beta(AoA_rate_boidiffmodel)$coefficients[,4], digits = 3)
+diff_AoA_rate_R2 <- round(c(NA, NA, NA, NA, summary(AoA_rate_boidiffmodel)$adj.r.squared), digits = 2)
+diff_AoA_rate_delta <- round(c(NA, NA, NA, NA, modelCompare(AoA_rate_step1, AoA_rate_boidiffmodel)$Delta), digits = 2)
+diff_AoA_rate_deltap <- c(NA, NA, NA, NA, modelCompare(AoA_rate_step1, AoA_rate_boidiffmodel)$p)
+
+#Make Table
+table4 <- data.frame(Predictor, adult_AoA_rate_beta, adult_AoA_rate_se, adult_AoA_rate_t, adult_AoA_rate_p, adult_AoA_rate_R2, adult_AoA_rate_delta, adult_AoA_rate_deltap, child_AoA_rate_beta, child_AoA_rate_se, child_AoA_rate_t, child_AoA_rate_p, child_AoA_rate_R2, child_AoA_rate_delta, child_AoA_rate_deltap, diff_AoA_rate_beta, diff_AoA_rate_se, diff_AoA_rate_t, diff_AoA_rate_p, diff_AoA_rate_R2, diff_AoA_rate_delta, diff_AoA_rate_deltap)
+
+#replace p values less than .001 with < .001
+table4 <- table4 %>% 
+  mutate_at(vars(adult_AoA_rate_p, adult_AoA_rate_deltap, child_AoA_rate_p, child_AoA_rate_deltap, diff_AoA_rate_p, diff_AoA_rate_deltap), funs(round(., 3))) %>% 
+  mutate_at(vars(adult_AoA_rate_p, adult_AoA_rate_deltap, child_AoA_rate_p, child_AoA_rate_deltap, diff_AoA_rate_p, diff_AoA_rate_deltap), ~replace(., . < .001, "< .001")) 
+
+#Check model without imageability for Adult BOI
+AoA_rate_adultmodel_noimage <- lm(AoA_K ~ Childes_lgFreq + Length + Adult_BOI, data = AoArate_dat)
+adult_AoA_rate_beta_noimage <-round(beta(AoA_rate_adultmodel_noimage)$coefficients[4,1], digits = 2)
+
+#Check VIF for adut model
+image_vif <- vif(AoA_rate_adultmodel)[3]
+adultBOI_vif <- vif(AoA_rate_adultmodel)[4]
+
+#Check zero-order correlation between Adult BOI and Imageability
+adult_boi_image <- cor(AoArate_dat$Adult_BOI, AoArate_dat$Image)
+```
+
+**Rating-based AoA**
+
+A model with only the predictors log CHILDES frequency, length, and imageability accounted for `r sprintf("%0.2f%%", summary(AoA_rate_step1)$adj.r.squared * 100)` of variance in rating-based AoA. The addition of adult BOI ratings to the model accounted for an additional `r sprintf("%0.2f%%", (summary(AoA_rate_adultmodel)$adj.r.squared - summary(AoA_rate_step1)$adj.r.squared) * 100)` of variance, whereas the addition of child BOI ratings to the model accounted for an additional `r sprintf("%0.2f%%", (summary(AoA_rate_childmodel)$adj.r.squared - summary(AoA_rate_step1)$adj.r.squared) * 100)` and the addition of BOI difference to the model accounted for an additional `r sprintf("%0.2f%%", (summary(AoA_rate_boidiffmodel)$adj.r.squared - summary(AoA_rate_step1)$adj.r.squared) * 100)`. For every unit increase in BOI rating, rating-based AoA decreased for Child ratings, ß = `r child_AoA_rate_beta[5]`, and BOI differences scores, ß = `r diff_AoA_rate_beta[5]`, whereas rating-based AoA increased for Adult ratings, ß = `r adult_AoA_rate_beta[5]`. The significant positive relationship between Adult BOI and rating-based AoA is due to the high correlation between Imageability and Adult BOI (r = `r adult_boi_image` for the 1,900 items in this regression), although this does not meet the threshold for multicollinearity (Imageability VIF = `r image_vif`, Adult BOI VIF = `r adultBOI_vif`). Indeed, when Imageability is removed from this model, the relationship between Adult BOI and rating-based AoA reverses (ß = `r adult_AoA_rate_beta_noimage`). See Table 4 for estimates of all model parameters.
+
+**Table 5**
+
+```{r show table 5}
+papaja::apa_table(table4, 
+                  caption = "Regression Coefficients from Item-Level Analyses Predicting Rating-based Age of Acquisition (N = 1,900)",
+                  note = "AoArate")
+```
+
