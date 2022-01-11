@@ -275,11 +275,11 @@ Corr_sem_NAcounts <-CBOI_corr_sem %>%
   add_rownames(var = "Measure") %>% 
   arrange(Measure)
 
-ggcorrplot(corr_results_ling, type = "upper", lab = TRUE, lab_size = 6, tl.cex = 16, outline.col = "white", ggtheme = ggplot2::theme_bw, colors = c("#f8766d", "white", "#00bfc4"))
+ggcorrplot(corr_results_ling, type = "upper", lab = TRUE, lab_size = 6, tl.cex = 16, outline.col = "white", ggtheme = ggplot2::theme_bw, colors = c("#f8766d", "white", "#00bfc4"), show.legend = FALSE)
 
 ggsave("figures/Figure3.png", width = 15, height = 15)
 
-ggcorrplot(corr_results_sem, type = "upper", lab = TRUE, lab_size = 8, tl.cex = 20, outline.col = "white", ggtheme = ggplot2::theme_bw, colors = c("#f8766d", "white", "#00bfc4"))
+ggcorrplot(corr_results_sem, type = "upper", lab = TRUE, lab_size = 8, tl.cex = 20, outline.col = "white", ggtheme = ggplot2::theme_bw, colors = c("#f8766d", "white", "#00bfc4"), show.legend = FALSE)
 
 ggsave("figures/Figure4.png", width = 25, height = 25)
 
